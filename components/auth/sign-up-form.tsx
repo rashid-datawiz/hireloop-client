@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 import { AuthModeToggle } from "@/components/auth/auth-mode-toggle"
@@ -9,24 +10,106 @@ import { AuthTextField } from "@/components/auth/auth-text-field"
 import { GoogleButton } from "@/components/auth/google-button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldGroup } from "@/components/ui/field"
+import { authClient } from "@/lib/auth-client"
 import {
   collectSignUpFormData,
-  type SignUpFormData,
+  mapAuthError,
+  type AuthField,
 } from "@/lib/auth-form-data"
 
-export function SignUpForm() {
-  const [submitted, setSubmitted] = React.useState<SignUpFormData | null>(null)
+/** Where to send a newly registered user once their account is created. */
+const POST_SIGN_UP_REDIRECT = "/"
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+/** better-auth enforces a minimum password length of 8 by default. */
+const MIN_PASSWORD_LENGTH = 8
+
+export function SignUpForm() {
+  const router = useRouter()
+
+  const [pending, setPending] = React.useState(false)
+  const [formError, setFormError] = React.useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = React.useState<
+    Partial<Record<AuthField, string>>
+  >({})
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+
+    setFormError(null)
 
     const formData = new FormData(event.currentTarget)
     const values = collectSignUpFormData(formData)
 
-    setSubmitted(values)
+    // Validate locally first so obvious mistakes don't cost a round trip.
+    const nextErrors: Partial<Record<AuthField, string>> = {}
 
-    // TODO: replace with `signUp.email(values)` from `@/lib/auth-client`.
-    console.info("[auth] sign-up form data", values)
+    if (!values.name) {
+      nextErrors.name = "Enter your name."
+    }
+
+    if (!values.email) {
+      nextErrors.email = "Enter your email address."
+    }
+
+    if (values.password.length < MIN_PASSWORD_LENGTH) {
+      nextErrors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`
+    }
+
+    if (!values.terms) {
+      nextErrors.terms = "You must accept the Terms of Service to continue."
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors)
+      return
+    }
+
+    setFieldErrors({})
+    setPending(true)
+
+    const { data, error } = await authClient.signUp.email({
+      name: values.name,
+      email: values.email,
+      password: values.password,
+      callbackURL: POST_SIGN_UP_REDIRECT,
+    })
+
+    if (error) {
+      const mapped = mapAuthError(error.code, error.message)
+
+      if (mapped.field) {
+        setFieldErrors({ [mapped.field]: mapped.message })
+      } else {
+        setFormError(mapped.message)
+      }
+
+      setPending(false)
+      return
+    }
+
+    if (!data) {
+      setFormError("Something went wrong. Please try again.")
+      setPending(false)
+      return
+    }
+
+    // The account was created and better-auth set the session cookie.
+    router.push(POST_SIGN_UP_REDIRECT)
+    router.refresh()
+  }
+
+  async function handleGoogleSignUp() {
+    setFormError(null)
+    setFieldErrors({})
+
+    const { error } = await authClient.signIn.social({
+      provider: "google",
+      callbackURL: POST_SIGN_UP_REDIRECT,
+    })
+
+    if (error) {
+      setFormError(mapAuthError(error.code, error.message).message)
+    }
   }
 
   return (
@@ -43,6 +126,15 @@ export function SignUpForm() {
 
         <AuthModeToggle className="mt-7" />
 
+        {formError ? (
+          <div
+            role="alert"
+            className="mt-5 rounded-xl border border-[#f87171]/30 bg-[#f87171]/10 px-4 py-3 font-display text-[13px] text-[#fca5a5]"
+          >
+            {formError}
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit} className="mt-7">
           <FieldGroup className="gap-5">
             <AuthTextField
@@ -51,6 +143,7 @@ export function SignUpForm() {
               label="Full name"
               placeholder="Your name"
               autoComplete="name"
+              error={fieldErrors.name}
             />
 
             <AuthTextField
@@ -60,6 +153,7 @@ export function SignUpForm() {
               label="Email"
               placeholder="you@example.com"
               autoComplete="email"
+              error={fieldErrors.email}
             />
 
             <AuthPasswordField
@@ -68,9 +162,14 @@ export function SignUpForm() {
               label="Password"
               placeholder="Create a password"
               autoComplete="new-password"
+              error={fieldErrors.password}
             />
 
-            <Field orientation="horizontal" className="items-start gap-2.5">
+            <Field
+              orientation="horizontal"
+              className="items-start gap-2.5"
+              data-invalid={fieldErrors.terms ? true : undefined}
+            >
               <Checkbox
                 id="sign-up-terms"
                 name="terms"
@@ -98,11 +197,18 @@ export function SignUpForm() {
               </label>
             </Field>
 
+            {fieldErrors.terms ? (
+              <p className="font-display text-[13px] text-[#f87171]">
+                {fieldErrors.terms}
+              </p>
+            ) : null}
+
             <button
               type="submit"
-              className="flex h-11 w-full items-center justify-center rounded-xl bg-[#635ff4] font-display text-[14px] font-medium text-white transition-colors outline-none hover:bg-[#5a55ee] focus-visible:ring-3 focus-visible:ring-[#635ff4]/50"
+              disabled={pending}
+              className="flex h-11 w-full items-center justify-center rounded-xl bg-[#635ff4] font-display text-[14px] font-medium text-white transition-colors outline-none hover:bg-[#5a55ee] focus-visible:ring-3 focus-visible:ring-[#635ff4]/50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Create Account
+              {pending ? "Creating account..." : "Create Account"}
             </button>
 
             <div className="flex items-center gap-4">
@@ -113,30 +219,13 @@ export function SignUpForm() {
               <span aria-hidden="true" className="h-px flex-1 bg-white/12" />
             </div>
 
-            <GoogleButton label="Sign up with Google" />
+            <GoogleButton
+              label="Sign up with Google"
+              onClick={handleGoogleSignUp}
+            />
           </FieldGroup>
         </form>
       </div>
-
-      {submitted ? (
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <p className="font-mono text-[11px] tracking-[0.15em] text-white/40 uppercase">
-            Collected form data
-          </p>
-          <dl className="mt-2.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 font-mono text-[12px]">
-            <dt className="text-white/40">name</dt>
-            <dd className="truncate text-white/85">{submitted.name}</dd>
-            <dt className="text-white/40">email</dt>
-            <dd className="truncate text-white/85">{submitted.email}</dd>
-            <dt className="text-white/40">password</dt>
-            <dd className="text-white/85">
-              {"•".repeat(Math.max(submitted.password.length, 8))}
-            </dd>
-            <dt className="text-white/40">terms</dt>
-            <dd className="text-white/85">{String(submitted.terms)}</dd>
-          </dl>
-        </div>
-      ) : null}
     </div>
   )
 }

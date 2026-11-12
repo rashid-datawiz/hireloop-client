@@ -1,4 +1,5 @@
-// Drives headless Chrome over the DevTools Protocol to verify the auth forms.
+// Drives headless Chrome over the DevTools Protocol to verify the auth pages.
+//
 // Usage: node scripts/verify-auth.mjs
 import { spawn } from "node:child_process"
 import { mkdtempSync } from "node:fs"
@@ -33,8 +34,7 @@ async function getWsUrl() {
   throw new Error("Chrome did not expose a debugging endpoint")
 }
 
-const wsUrl = await getWsUrl()
-const ws = new WebSocket(wsUrl)
+const ws = new WebSocket(await getWsUrl())
 await new Promise((resolve, reject) => {
   ws.onopen = resolve
   ws.onerror = reject
@@ -43,6 +43,7 @@ await new Promise((resolve, reject) => {
 let nextId = 1
 const pending = new Map()
 const consoleLogs = []
+const networkCalls = []
 
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data)
@@ -57,10 +58,31 @@ ws.onmessage = (event) => {
     return
   }
   if (msg.method === "Runtime.consoleAPICalled") {
-    const text = (msg.params.args ?? [])
-      .map((a) => a.value ?? a.description ?? "")
-      .join(" ")
-    consoleLogs.push(text)
+    consoleLogs.push(
+      (msg.params.args ?? [])
+        .map((a) => a.value ?? a.description ?? "")
+        .join(" ")
+    )
+  }
+  if (
+    msg.method === "Network.requestWillBeSent" &&
+    msg.params.request.url.includes("/api/auth")
+  ) {
+    networkCalls.push({
+      url: msg.params.request.url,
+      method: msg.params.request.method,
+      postData: msg.params.request.postData,
+      status: undefined,
+    })
+  }
+  if (
+    msg.method === "Network.responseReceived" &&
+    msg.params.response.url.includes("/api/auth")
+  ) {
+    const entry = networkCalls.find(
+      (c) => c.url === msg.params.response.url && c.status === undefined
+    )
+    if (entry) entry.status = msg.params.response.status
   }
 }
 
@@ -74,7 +96,6 @@ function send(method, params = {}, sessionId) {
   return new Promise((resolve, reject) => pending.set(id, { resolve, reject }))
 }
 
-// Attach to a fresh tab
 const { targetId } = await send("Target.createTarget", { url: "about:blank" })
 const { sessionId } = await send("Target.attachToTarget", {
   targetId,
@@ -85,11 +106,7 @@ const call = (method, params) => send(method, params, sessionId)
 
 await call("Runtime.enable")
 await call("Page.enable")
-
-async function goto(url) {
-  await call("Page.navigate", { url })
-  await sleep(1400)
-}
+await call("Network.enable")
 
 async function evaluate(expression) {
   const res = await call("Runtime.evaluate", {
@@ -99,7 +116,8 @@ async function evaluate(expression) {
   })
   if (res.exceptionDetails) {
     throw new Error(
-      `Evaluate failed: ${JSON.stringify(res.exceptionDetails.exception?.description ?? res.exceptionDetails)}`
+      res.exceptionDetails.exception?.description ??
+        JSON.stringify(res.exceptionDetails)
     )
   }
   return res.result.value
@@ -113,7 +131,27 @@ function check(name, pass, detail = "") {
   )
 }
 
-// ---------------------------------------------------------------- sign-in
+async function goto(url) {
+  await call("Page.navigate", { url })
+  await sleep(1400)
+}
+
+const FILL = (fields) => `(() => {
+  const form = document.querySelector('form');
+  const set = (name, value) => {
+    const el = form.querySelector('[name="' + name + '"]');
+    if (!el) return;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el, value);
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+    el.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+  ${fields
+    .map(([n, v]) => `set(${JSON.stringify(n)}, ${JSON.stringify(v)});`)
+    .join("\n  ")}
+  form.requestSubmit();
+})()`
+
+// ---------------------------------------------------------------- sign-in page
 await goto(`${BASE}/sign-in`)
 
 check(
@@ -139,64 +177,9 @@ check(
   })()`)
 )
 
-// Fill and submit, then read the collected-data panel the form renders.
-const signInResult = await evaluate(`(() => {
-  const form = document.querySelector('form');
-  const set = (name, value) => {
-    const el = form.querySelector('[name="' + name + '"]');
-    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
-    Object.getOwnPropertyDescriptor(proto.prototype, 'value').set.call(el, value);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  };
-  set('email', 'seeker@hireloop.dev');
-  set('password', 'supersecret123');
-  form.querySelector('input[name="rememberMe"]').click();
-  form.requestSubmit();
-  return true;
-})()`)
-void signInResult
-
-await sleep(700)
-
-const signInPanel = await evaluate(`(() => {
-  const panel = [...document.querySelectorAll('div')].find(d =>
-    /collected form data/i.test(d.innerText || '')
-  );
-  if (!panel) return null;
-  return panel.innerText.replace(/\\s+/g, ' ').trim();
-})()`)
-
 check(
-  "sign-in submit renders collected data",
-  signInPanel !== null,
-  signInPanel ?? "no panel"
-)
-
-check(
-  "sign-in collected email is correct",
-  (signInPanel ?? "").includes("seeker@hireloop.dev"),
-  signInPanel ?? ""
-)
-
-check(
-  "sign-in collected rememberMe is true",
-  /rememberMe\\s+true/.test(signInPanel ?? "") ||
-    (signInPanel ?? "").includes("rememberMe true"),
-  signInPanel ?? ""
-)
-
-check(
-  "sign-in password is masked in the panel",
-  !(signInPanel ?? "").includes("supersecret123"),
-  "password leaked" // only reached on failure
-)
-
-const loggedSignIn = consoleLogs.find((l) => l.includes("sign-in form data"))
-check(
-  "sign-in handler logged the payload",
-  Boolean(loggedSignIn),
-  loggedSignIn ?? "no log"
+  "no 'Collected form data' debug panel remains",
+  !(await evaluate(`/collected form data/i.test(document.body.innerText)`))
 )
 
 // ---------------------------------------------------------------- password toggle
@@ -218,7 +201,72 @@ check(
   String(toggled)
 )
 
-// ---------------------------------------------------------------- sign-up
+// ---------------------------------------------------------------- sign-in validation
+networkCalls.length = 0
+await goto(`${BASE}/sign-in`)
+await evaluate(
+  FILL([
+    ["email", ""],
+    ["password", ""],
+  ])
+)
+await sleep(500)
+
+check(
+  "empty sign-in shows field validation",
+  await evaluate(`/Enter your email address/i.test(document.body.innerText)`),
+  await evaluate(
+    `document.body.innerText.match(/Enter your [^.]*\\./)?.[0] ?? 'no message'`
+  )
+)
+check(
+  "no auth request sent for empty sign-in",
+  networkCalls.length === 0,
+  `${networkCalls.length} calls`
+)
+
+// ---------------------------------------------------------------- wrong password
+const email = `signin-${Date.now()}@hireloop.dev`
+networkCalls.length = 0
+await goto(`${BASE}/sign-in`)
+await evaluate(
+  FILL([
+    ["email", email],
+    ["password", "password1234"],
+  ])
+)
+await sleep(2500)
+
+const signInCall = networkCalls.find((c) => c.url.includes("/sign-in/email"))
+check(
+  "sign-in request was sent to better-auth",
+  Boolean(signInCall),
+  signInCall?.url ?? "none"
+)
+check(
+  "sign-in request sends email + password",
+  (() => {
+    if (!signInCall?.postData) return false
+    try {
+      const body = JSON.parse(signInCall.postData)
+      return body.email === email && body.password === "password1234"
+    } catch {
+      return false
+    }
+  })(),
+  signInCall?.postData ?? ""
+)
+check(
+  "sign-in with unknown account shows an error",
+  await evaluate(
+    `/incorrect|not found|no account|wrong/i.test(document.body.innerText)`
+  ),
+  await evaluate(
+    `document.body.innerText.match(/[^.]*\\b(incorrect|not found|no account)[^.]*\\./i)?.[0] ?? 'no message'`
+  )
+)
+
+// ---------------------------------------------------------------- sign-up page
 await goto(`${BASE}/sign-up`)
 
 check(
@@ -242,48 +290,6 @@ check(
     const names = [...f.querySelectorAll('input')].map(i => i.name);
     return ['name','email','password','terms'].every(n => names.includes(n));
   })()`)
-)
-
-await evaluate(`(() => {
-  const form = document.querySelector('form');
-  const set = (name, value) => {
-    const el = form.querySelector('[name="' + name + '"]');
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, value);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  };
-  set('name', 'Abdur Rashid');
-  set('email', 'recruiter@hireloop.dev');
-  set('password', 'anotherpass456');
-  form.querySelector('input[name="terms"]').click();
-  form.requestSubmit();
-  return true;
-})()`)
-
-await sleep(700)
-
-const signUpPanel = await evaluate(`(() => {
-  const panel = [...document.querySelectorAll('div')].find(d =>
-    /collected form data/i.test(d.innerText || '')
-  );
-  if (!panel) return null;
-  return panel.innerText.replace(/\\s+/g, ' ').trim();
-})()`)
-
-check(
-  "sign-up submit renders collected data",
-  signUpPanel !== null,
-  signUpPanel ?? ""
-)
-check(
-  "sign-up collected name is correct",
-  (signUpPanel ?? "").includes("Abdur Rashid"),
-  signUpPanel ?? ""
-)
-check(
-  "sign-up collected terms is true",
-  (signUpPanel ?? "").includes("terms true"),
-  signUpPanel ?? ""
 )
 
 // ---------------------------------------------------------------- toggle navigation

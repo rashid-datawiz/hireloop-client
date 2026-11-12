@@ -9,7 +9,10 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:memory": "node scripts/dev-memory-db.mjs",
+    "verify:auth": "node scripts/verify-auth.mjs",
+    "verify:signup": "node scripts/verify-signup.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -33,6 +36,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.4",
+    "mongodb-memory-server": "^11.3.0",
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
