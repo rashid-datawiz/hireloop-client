@@ -2,10 +2,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* @custom-variant dark (&:is(.dark *)); */
 
 @theme inline {
     --font-heading: var(--font-sans);
+    --font-display: var(--font-poppins);
     --font-sans: var(--font-sans);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -54,7 +55,7 @@
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
+    --primary: #635ff4;
     --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
@@ -65,7 +66,7 @@
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --ring: #635ff4;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -89,8 +90,8 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
+    --primary: #635ff4;
+    --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -100,7 +101,7 @@
     --destructive: oklch(0.704 0.191 22.216);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --ring: #635ff4;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -126,4 +127,46 @@
   html {
     @apply font-sans;
     }
+}
+
+@layer components {
+  /* Hero backdrop: near-black base with a violet glow at the bottom */
+  .hero-backdrop {
+    background-color: #0a0a0c;
+    background-image:
+      linear-gradient(
+        to bottom,
+        rgb(0 0 0 / 0.55) 0%,
+        rgb(0 0 0 / 0) 24%,
+        rgb(0 0 0 / 0) 100%
+      ),
+      radial-gradient(
+        60% 46% at 50% 104%,
+        rgb(99 95 244 / 0.34) 0%,
+        rgb(84 62 190 / 0.14) 45%,
+        rgb(99 95 244 / 0) 74%
+      );
+  }
+
+  /* Sparse starfield scattered across the lower half of the hero */
+  .hero-stars {
+    background-image:
+      radial-gradient(1.6px 1.6px at 24px 36px, rgb(255 255 255 / 0.75), transparent 100%),
+      radial-gradient(1.2px 1.2px at 142px 96px, rgb(255 255 255 / 0.5), transparent 100%),
+      radial-gradient(1.4px 1.4px at 226px 58px, rgb(255 255 255 / 0.6), transparent 100%),
+      radial-gradient(1.2px 1.2px at 96px 152px, rgb(196 181 254 / 0.6), transparent 100%),
+      radial-gradient(1.6px 1.6px at 208px 140px, rgb(255 255 255 / 0.5), transparent 100%);
+    background-size:
+      280px 190px,
+      280px 190px,
+      280px 190px,
+      280px 190px,
+      280px 190px;
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgb(0 0 0 / 0.4) 45%,
+      #000 100%
+    );
+  }
 }
