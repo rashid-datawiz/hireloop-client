@@ -221,8 +221,8 @@ check(
 )
 check(
   "no auth request sent for empty sign-in",
-  networkCalls.length === 0,
-  `${networkCalls.length} calls`
+  networkCalls.filter((c) => c.url.includes("/sign-in/email")).length === 0,
+  `${networkCalls.length} auth calls (navbar session fetch included)`
 )
 
 // ---------------------------------------------------------------- wrong password

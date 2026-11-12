@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation"
 import { MenuIcon } from "lucide-react"
 
 import logo from "@/app/images/logo.png"
+import { MobileAuthActions, UserMenu } from "@/components/auth/user-menu"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -77,18 +78,7 @@ export function Navbar() {
             className="mx-6 hidden h-5 w-px bg-white/15 md:block"
           />
 
-          <Link
-            href="/sign-in"
-            className="hidden rounded-md text-sm font-normal text-[#8b87b3] transition-colors outline-none hover:text-white focus-visible:ring-3 focus-visible:ring-[#635ff4]/60 md:block"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/sign-up"
-            className="ml-10 hidden h-10 items-center justify-center rounded-lg bg-[#635ff4] px-5 text-sm font-medium text-white transition-colors outline-none hover:bg-[#5a55ee] focus-visible:ring-3 focus-visible:ring-[#635ff4]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#232327] md:inline-flex"
-          >
-            Get Started
-          </Link>
+          <UserMenu />
 
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger
@@ -142,20 +132,7 @@ export function Navbar() {
               </nav>
 
               <div className="mt-auto flex flex-col gap-2 border-t border-white/10 p-4">
-                <Link
-                  href="/sign-in"
-                  onClick={() => setMobileOpen(false)}
-                  className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-white/15 text-sm font-medium text-[#c9c6e4] transition-colors hover:bg-white/5 hover:text-white"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  href="/sign-up"
-                  onClick={() => setMobileOpen(false)}
-                  className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-[#635ff4] text-sm font-medium text-white transition-colors hover:bg-[#5a55ee]"
-                >
-                  Get Started
-                </Link>
+                <MobileAuthActions onNavigate={() => setMobileOpen(false)} />
               </div>
             </SheetContent>
           </Sheet>

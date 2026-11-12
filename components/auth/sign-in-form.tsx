@@ -60,6 +60,7 @@ export function SignInForm() {
       email: values.email,
       password: values.password,
       rememberMe: values.rememberMe,
+      callbackURL: POST_SIGN_IN_REDIRECT,
     })
 
     if (error) {

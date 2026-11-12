@@ -175,8 +175,8 @@ check(
 
 check(
   "no auth request sent for invalid input",
-  networkCalls.length === 0,
-  `${networkCalls.length} calls`
+  networkCalls.filter((c) => c.url.includes("/sign-up/email")).length === 0,
+  `${networkCalls.length} auth calls (navbar session fetch included)`
 )
 
 // ---------------------------------------------------------------- real sign-up
