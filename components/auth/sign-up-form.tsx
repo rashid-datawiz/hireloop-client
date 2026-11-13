@@ -6,6 +6,7 @@ import Link from "next/link"
 
 import { AuthModeToggle } from "@/components/auth/auth-mode-toggle"
 import { AuthPasswordField } from "@/components/auth/auth-password-field"
+import { AuthRoleField } from "@/components/auth/auth-role-field"
 import { AuthTextField } from "@/components/auth/auth-text-field"
 import { GoogleButton } from "@/components/auth/google-button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -16,6 +17,7 @@ import {
   mapAuthError,
   type AuthField,
 } from "@/lib/auth-form-data"
+import { isUserRole } from "@/lib/auth-roles"
 
 /** Where to send a newly registered user once their account is created. */
 const POST_SIGN_UP_REDIRECT = "/"
@@ -55,11 +57,19 @@ export function SignUpForm() {
       nextErrors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`
     }
 
+    // `null` until the picked role is known to be one better-auth accepts.
+    const role = isUserRole(values.role) ? values.role : null
+
+    if (!role) {
+      nextErrors.role =
+        "Choose whether you're joining as a seeker, recruiter, or admin."
+    }
+
     if (!values.terms) {
       nextErrors.terms = "You must accept the Terms of Service to continue."
     }
 
-    if (Object.keys(nextErrors).length > 0) {
+    if (role === null || Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors)
       return
     }
@@ -71,6 +81,7 @@ export function SignUpForm() {
       name: values.name,
       email: values.email,
       password: values.password,
+      role,
       callbackURL: POST_SIGN_UP_REDIRECT,
     })
 
@@ -163,6 +174,12 @@ export function SignUpForm() {
               placeholder="Create a password"
               autoComplete="new-password"
               error={fieldErrors.password}
+            />
+
+            <AuthRoleField
+              name="role"
+              label="I am joining as a"
+              error={fieldErrors.role}
             />
 
             <Field

@@ -13,10 +13,11 @@ export type SignUpFormData = {
   name: string
   email: string
   password: string
+  role: string
   terms: boolean
 }
 
-export type AuthField = "name" | "email" | "password" | "terms"
+export type AuthField = "name" | "email" | "password" | "role" | "terms"
 
 export type AuthError = {
   /** Human readable message to show the user. */
@@ -44,6 +45,7 @@ export function collectSignUpFormData(formData: FormData): SignUpFormData {
     name: String(formData.get("name") ?? "").trim(),
     email: String(formData.get("email") ?? "").trim(),
     password: String(formData.get("password") ?? ""),
+    role: String(formData.get("role") ?? "").trim(),
     terms: formData.get("terms") === "on",
   }
 }
@@ -74,6 +76,8 @@ export function mapAuthError(
       }
     case "INVALID_PASSWORD":
       return { field: "password", message: "Invalid password." }
+    case "INVALID_ROLE":
+      return { field: "role", message: "Choose a valid account type." }
     case "PASSWORD_TOO_SHORT":
       return {
         field: "password",

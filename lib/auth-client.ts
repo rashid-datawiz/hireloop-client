@@ -1,4 +1,7 @@
 import { createAuthClient } from "better-auth/react"
+import { inferAdditionalFields } from "better-auth/client/plugins"
+// Type-only import: the server module must never end up in the browser bundle.
+import type { auth } from "@/lib/auth"
 
 export const authClient = createAuthClient({
   /**
@@ -10,6 +13,11 @@ export const authClient = createAuthClient({
    */
   baseURL:
     process.env.NEXT_PUBLIC_BETTER_AUTH_URL ?? process.env.BETTER_AUTH_URL,
+  /**
+   * Teaches the client about the additional user fields (currently `role`) so
+   * they can be sent to better-auth with type checking.
+   */
+  plugins: [inferAdditionalFields<typeof auth>()],
 })
 
 export const { signIn, signUp, useSession } = authClient

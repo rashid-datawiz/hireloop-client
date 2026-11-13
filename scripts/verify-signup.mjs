@@ -191,6 +191,7 @@ await evaluate(`(() => {
   set('name','Browser Tester');
   set('email','${uniqueEmail}');
   set('password','password1234');
+  form.querySelector('input[name="role"][value="recruiter"]').click();
   form.querySelector('input[name="terms"]').click();
   form.requestSubmit();
 })()`)
@@ -219,6 +220,18 @@ check(
         body.email === uniqueEmail &&
         body.password === "password1234"
       )
+    } catch {
+      return false
+    }
+  })(),
+  signUpCall?.postData ?? ""
+)
+check(
+  "sign-up request sent the selected role",
+  (() => {
+    if (!signUpCall?.postData) return false
+    try {
+      return JSON.parse(signUpCall.postData).role === "recruiter"
     } catch {
       return false
     }

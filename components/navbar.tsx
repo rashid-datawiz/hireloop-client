@@ -39,7 +39,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = React.useState(false)
 
   return (
-    <header className="sticky top-0 z-50 w-full px-4 pt-3 sm:px-6 lg:px-10">
+    <header className="sticky top-0 z-50 w-full bg-[#0a0a0c] px-4 pt-3 sm:px-6 lg:px-10">
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center rounded-2xl border border-white/[0.07] bg-[#232327]/95 pr-5 pl-8 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         <Link
           href="/"

@@ -84,7 +84,9 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  /* The page surface is the same near-black the hero and auth backdrops use,
+     so the navbar and the sections below it read as one continuous surface. */
+  --background: #0a0a0c;
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
